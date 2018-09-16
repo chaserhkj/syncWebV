@@ -11,7 +11,9 @@ import (
 	"net/http"
 )
 
-var addr = flag.String("addr", ":8080", "http service address")
+var addr = flag.String("addr", ":4433", "http service address")
+var cert = flag.String("cert", "./fullchain.pem", "TLS certificate")
+var priv = flag.String("priv", "./privkey.pem", "TLS private key")
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL)
@@ -26,7 +28,7 @@ func main() {
 	http.HandleFunc("/sync", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
 	})
-	err := http.ListenAndServe(*addr, nil)
+	err := http.ListenAndServeTLS(*addr, *cert, *priv, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}

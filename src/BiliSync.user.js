@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      0.1
+// @version      0.2
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -15,7 +15,7 @@
 // ==/UserScript==
 // Default host is set to my party VPN private address, which is easier for my
 // friends to setup. You may want to change this.
-var BSdefaultHost = "10.117.127.251:8080"
+var BSdefaultHost = "desktop.fastpub.zt.chaserhkj.me:4433"
 waitForKeyElements(".bilibili-player-video video", BiliSync_Main, true);
 var syncInterval = 5;
 var syncDiff = 1;
@@ -130,7 +130,7 @@ function BSenable() {
         return;
     }
     BSenabled = true;
-    host = "ws://" + host + "/sync";
+    host = "wss://" + host + "/sync";
     BSwebsocket = new WebSocket(host);
     BSwebsocket.onopen = function(event){
         BSstatus.text("Connection established. Click to reset playback.");
