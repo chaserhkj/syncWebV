@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      0.6
+// @version      0.6.1
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -156,7 +156,7 @@ function BSenable() {
         BSstatus.text("Connection established. Click to reset playback. Right click to disable.");
         BSattach();
         if (BSvideo.paused) {
-            BSonPaused(null);
+            BSonPause(null);
         } else {
             BSonPlay(null);
         }
