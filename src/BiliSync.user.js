@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      0.2
+// @version      0.3
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -19,6 +19,7 @@ var BSdefaultHost = "desktop.fastpub.zt.chaserhkj.me:4433"
 waitForKeyElements(".bilibili-player-video video", BiliSync_Main, true);
 var syncInterval = 5;
 var syncDiff = 1;
+var delayInterval = 5;
 
 var BSstatus;
 var BSvideo;
@@ -26,6 +27,8 @@ var BSenabled = false;
 var BSwebsocket;
 var blocked = false;
 var syncTask;
+var delayTask;
+var estDelay = 0;
 
 function BiliSync_Main() {
     BSstatus = $("<div/>").text("BiliSync Standby, click to enable.").css("text-align","center").css("font-size","15px").css("padding","2px");
@@ -51,26 +54,28 @@ function BiliSync_Main() {
     mo.observe($("div.bilibili-player-video")[0], mo_config);
 }
 
-function BSplayV() {
+function BSplayV(delay) {
     if (BSvideo.paused) {
         BSvideo.click();
     }
+    BSseekV(BSvideo.currentTime, delay);
 }
 
-function BSpauseV() {
+function BSpauseV(delay) {
     if (!BSvideo.paused) {
         BSvideo.click();
     }
+    BSseekV(BSvideo.currentTime, delay);
 }
 
-function BSseekV(target) {
-    BSvideo.currentTime = target;
+function BSseekV(target, delay) {
+    BSvideo.currentTime = target + (delay + estDelay) / 1000;
 }
 
-function BSsyncV(target) {
-    if ((BSvideo.currentTime - target) >= syncDiff) {
+function BSsyncV(target, delay) {
+    if ((BSvideo.currentTime - target - (delay + estDelay) / 1000) >= syncDiff) {
         blocked = true;
-        BSseekV(target);
+        BSseekV(target, delay);
         $(BSvideo).one("seeking", function(event){
                 blocked = false;
         });
@@ -86,21 +91,21 @@ function BSonPlay(event){
     if (!BSenabled || blocked) {
         return;
     }
-    var data = {type:"PLAY"};
+    var data = {type:"PLAY", delay:estDelay};
     BSwebsocket.send(JSON.stringify(data));
 }
 function BSonPause(event) {
     if (!BSenabled || blocked) {
         return;
     }
-    var data = {type:"PAUSE"};
+    var data = {type:"PAUSE", delay:estDelay};
     BSwebsocket.send(JSON.stringify(data));
 }
 function BSonSeek(event) {
     if (!BSenabled || blocked) {
         return;
     }
-    var data = {type:"SEEK", target:BSvideo.currentTime};
+    var data = {type:"SEEK", target:BSvideo.currentTime, delay:estDelay};
     BSwebsocket.send(JSON.stringify(data));
 }
 
@@ -109,9 +114,13 @@ function BSattach() {
     $(BSvideo).on("pause", BSonPause);
     $(BSvideo).on("seeking", BSonSeek);
     syncTask = setInterval(function(){
-        var data = {type:"SYNC", target:BSvideo.currentTime};
+        var data = {type:"SYNC", target:BSvideo.currentTime, delay:estDelay};
         BSwebsocket.send(JSON.stringify(data));
     }, 1000 * syncInterval);
+    delayTask = setInterval(function(){
+        var data = {type:"PING", timestamp:$.now()}
+        BSwebsocket.send(JSON.stringify(data));
+    }, 1000 * delayInterval);
 }
 
 function BSdetach() {
@@ -119,6 +128,7 @@ function BSdetach() {
     $(BSvideo).off("pause", BSonPause);
     $(BSvideo).off("seeking", BSonSeek);
     clearInterval(syncTask);
+    clearInterval(delayTask);
 }
 
 function BSenable() {
@@ -159,29 +169,36 @@ function BSdisable() {
 function BSmsghandler(event) {
     var data = JSON.parse(event.data);
     switch(data.type) {
+        case "PING":
+            var newDelay = ($.now() - data.timestamp) / 2
+            if (estDelay == 0) {
+                estDelay = newDelay
+            } else {
+                estDelay = estDelay * 0.9 + newDelay * 0.1
+            }
         case "PLAY":
             blocked = true;
-            BSplayV();
-            $(BSvideo).one("play", function(event){
+            BSplayV(data.delay);
+            $(BSvideo).one("seeking", function(event){
                 blocked = false;
             });
             break;
         case "PAUSE":
             blocked = true;
-            BSpauseV();
-            $(BSvideo).one("pause", function(event){
+            BSpauseV(data.delay);
+            $(BSvideo).one("seeking", function(event){
                 blocked = false;
             });
             break;
         case "SEEK":
             blocked = true;
-            BSseekV(data.target);
+            BSseekV(data.target, data.delay);
             $(BSvideo).one("seeking", function(event){
                 blocked = false;
             });
             break;
         case "SYNC":
-            BSsyncV(data.target);
+            BSsyncV(data.target, data.delay);
             break;
     }
 }

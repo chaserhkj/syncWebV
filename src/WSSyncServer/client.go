@@ -7,6 +7,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -76,6 +77,17 @@ func (c *Client) readPump() {
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
 		log.Printf("Received message from %s: %s", c.conn.RemoteAddr().String(), string(message))
+		var data interface{}
+		if err := json.Unmarshal(message, &data); err == nil {
+			if m, ok := data.(map[string]interface{}); ok {
+				if ti, ok := m["type"]; ok {
+					if t, ok := ti.(string); ok && t == "PING" {
+						c.send <- message
+						continue
+					}
+				}
+			}
+		}
 		msg := &Msg{
 			message: message,
 			sender:  c,
