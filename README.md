@@ -68,7 +68,8 @@ On Bilibili play page, a banner should be shown below the video player, which sh
 
 ## Roadmap
 
-- [  ] Session control
+- [  ] Use context menu to refine UI
+- [  ] Session control (Show other online users)
 - [  ] Authentication
 - [  ] Standardize the protocol
 - [  ] Support for other sites
