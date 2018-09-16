@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      0.5.3
+// @version      0.6
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
 // @match        https://www.bilibili.com/bangumi/play/*
-// @grant        none
+// @grant        GM.getValue
+// @grant        GM.setValue
 // @require      https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js
 // @require      https://gist.github.com/raw/2625891/waitForKeyElements.js
 // @updateURL    https://github.com/chaserhkj/syncWebV/raw/master/src/BiliSync.user.js
@@ -16,6 +17,7 @@
 // Default host is set to my party VPN private address, which is easier for my
 // friends to setup. You may want to change this.
 var BSdefaultHost = "desktop.fastpub.zt.chaserhkj.me:4433"
+var BSaddr;
 waitForKeyElements(".bilibili-player-video video", BiliSync_Main, true);
 var syncInterval = 5;
 var syncDiff = 1;
@@ -92,21 +94,21 @@ function BSonPlay(event){
     if (!BSenabled || blocked) {
         return;
     }
-    var data = {type:"PLAY", delay:estDelay};
+    var data = {type:"PLAY", delay:estDelay, page:location.href};
     BSwebsocket.send(JSON.stringify(data));
 }
 function BSonPause(event) {
     if (!BSenabled || blocked) {
         return;
     }
-    var data = {type:"PAUSE", delay:estDelay};
+    var data = {type:"PAUSE", delay:estDelay, page:location.href};
     BSwebsocket.send(JSON.stringify(data));
 }
 function BSonSeek(event) {
     if (!BSenabled || blocked) {
         return;
     }
-    var data = {type:"SEEK", target:BSvideo.currentTime, delay:estDelay};
+    var data = {type:"SEEK", target:BSvideo.currentTime, delay:estDelay, page:location.href};
     BSwebsocket.send(JSON.stringify(data));
 }
 
@@ -115,7 +117,7 @@ function BSattach() {
     $(BSvideo).on("pause", BSonPause);
     $(BSvideo).on("seeking", BSonSeek);
     syncTask = setInterval(function(){
-        var data = {type:"SYNC", target:BSvideo.currentTime, delay:estDelay};
+        var data = {type:"SYNC", target:BSvideo.currentTime, delay:estDelay, page:location.href};
         BSwebsocket.send(JSON.stringify(data));
     }, 1000 * syncInterval);
     delayTask = setInterval(function(){
@@ -148,8 +150,8 @@ function BSenable() {
         return;
     }
     BSenabled = true;
-    host = "wss://" + host + "/sync";
-    BSwebsocket = new WebSocket(host);
+    BSaddr = "wss://" + host + "/sync";
+    BSwebsocket = new WebSocket(BSaddr);
     BSwebsocket.onopen = function(event){
         BSstatus.text("Connection established. Click to reset playback. Right click to disable.");
         BSattach();
@@ -181,6 +183,9 @@ function BSdisable() {
 
 function BSmsghandler(event) {
     var data = JSON.parse(event.data);
+    if (data.type != "PING" && data.page != location.href) {
+        return;
+    }
     switch(data.type) {
         case "PING":
             var newDelay = ($.now() - data.timestamp) / 2
