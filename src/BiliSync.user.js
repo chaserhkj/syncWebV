@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      0.6.1
+// @version      0.6.2
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -112,14 +112,16 @@ function BSonSeek(event) {
     BSwebsocket.send(JSON.stringify(data));
 }
 
+function BSonsync() {
+    var data = {type:"SYNC", target:BSvideo.currentTime, delay:estDelay, page:location.href};
+    BSwebsocket.send(JSON.stringify(data));
+}
+
 function BSattach() {
     $(BSvideo).on("play", BSonPlay);
     $(BSvideo).on("pause", BSonPause);
     $(BSvideo).on("seeking", BSonSeek);
-    syncTask = setInterval(function(){
-        var data = {type:"SYNC", target:BSvideo.currentTime, delay:estDelay, page:location.href};
-        BSwebsocket.send(JSON.stringify(data));
-    }, 1000 * syncInterval);
+    syncTask = setInterval(BSonsync, 1000 * syncInterval);
     delayTask = setInterval(function(){
         var data = {type:"PING", timestamp:$.now()}
         BSwebsocket.send(JSON.stringify(data));
@@ -160,6 +162,7 @@ function BSenable() {
         } else {
             BSonPlay(null);
         }
+        BSonsync();
     };
     BSwebsocket.onerror = function(event){
         BSstatus.text("Connection error. Click to retry.");
