@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      0.5
+// @version      0.5.1
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -168,7 +168,7 @@ function BSdisable() {
         return;
     }
     BSenabled = false;
-    BSwebsocket.close();
+    BSwebsocket.close(1000);
     BSdetach();
     BSstatus.text("Connection closed. Click to reconnect.");
 }
