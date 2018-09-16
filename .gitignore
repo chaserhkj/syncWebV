@@ -1,4 +1,6 @@
 .envrc
 pkg/
 src/github.com/
+src/WSSyncServer/*.pem
+src/WSSyncServer/WSSyncServer
 
