@@ -45,8 +45,9 @@ function BiliSync_Main() {
     var mo_config = { attributes: true, childList: true, subtree: true };
     var mo = new MutationObserver(function(mList){
         for(var mutation of mList) {
-            if (mutation.type == 'childList') {
+            if (mutation.type == 'childList' && mutation.removedNodes.length > 0) {
                 BSdisable();
+                BSstatus.remove();
                 waitForKeyElements(".bilibili-player-video video", BiliSync_Main, true);
             }
         }
