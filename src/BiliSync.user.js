@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      1.0
+// @version      1.0.1
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
 // @match        https://www.bilibili.com/bangumi/play/*
-// @grant        GM.getValue
-// @grant        GM.setValue
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @require      https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js
 // @require      https://gist.github.com/raw/2625891/waitForKeyElements.js
 // @updateURL    https://github.com/chaserhkj/syncWebV/raw/master/src/BiliSync.user.js
@@ -25,9 +25,9 @@ var delayInterval = 5;
 
 var BSstatus;
 var BSvideo;
-var BSenabled = false;
+var BSenabled;
 var BSwebsocket;
-var blocked = false;
+var pending = 0;
 var syncTask;
 var delayTask;
 var estDelay = 0;
@@ -41,7 +41,7 @@ function BiliSync_Main() {
         if (BSenabled) {
             BSresetV();
         } else {
-            BSenable();
+            BSenable(false);
         }
     });
     var mo_config = { attributes: true, childList: true, subtree: true };
@@ -49,7 +49,7 @@ function BiliSync_Main() {
         for(var mutation of mList) {
             if (mutation.type == 'childList' && mutation.removedNodes.length > 0) {
                 if (BSenabled) {
-                    GM.setValue("lastAddr", BSaddr);
+                    GM_setValue("lastAddr", BSaddr);
                 }
                 BSdisable();
                 BSstatus.remove();
@@ -58,11 +58,10 @@ function BiliSync_Main() {
         }
     });
     mo.observe($("div.bilibili-player-video")[0], mo_config);
-    var storeAddr = GM.getValue("lastAddr", "");
+    var storeAddr = GM_getValue("lastAddr", "");
     if (storeAddr != ""){
         BSaddr = storeAddr;
-        BSenable();
-        BSonpage();
+        $.when(true).done(BSenable);
     }
 }
 
@@ -86,10 +85,10 @@ function BSseekV(target, delay) {
 
 function BSsyncV(target, delay) {
     if ((BSvideo.currentTime - target - (delay + estDelay) / 1000) >= syncDiff) {
-        blocked = true;
+        pending ++;
         BSseekV(target, delay);
         $(BSvideo).one("seeking", function(event){
-                blocked = false;
+                pending --;
         });
     }
 }
@@ -100,21 +99,21 @@ function BSresetV(target) {
 }
 
 function BSonPlay(event){
-    if (!BSenabled || blocked) {
+    if (!BSenabled || pending > 0) {
         return;
     }
     var data = {type:"PLAY", delay:estDelay, page:location.href};
     BSwebsocket.send(JSON.stringify(data));
 }
 function BSonPause(event) {
-    if (!BSenabled || blocked) {
+    if (!BSenabled || pending > 0) {
         return;
     }
     var data = {type:"PAUSE", delay:estDelay, page:location.href};
     BSwebsocket.send(JSON.stringify(data));
 }
 function BSonSeek(event) {
-    if (!BSenabled || blocked) {
+    if (!BSenabled || pending > 0) {
         return;
     }
     var data = {type:"SEEK", target:BSvideo.currentTime, delay:estDelay, page:location.href};
@@ -165,12 +164,12 @@ function BScontextMenu(event) {
     event.preventDefault();
 }
 
-function BSenable() {
+function BSenable(resuming) {
     if (BSenabled) {
         return;
     }
     // Reset value on init
-    GM.setValue("lastAddr", "");
+    GM_setValue("lastAddr", "");
     if (BSaddr == null)  {
         var host = prompt("Please enter Host:Port", BSdefaultHost);
         if (host == null) {
@@ -180,23 +179,29 @@ function BSenable() {
     }
     BSenabled = true;
     BSwebsocket = new WebSocket(BSaddr);
-    BSwebsocket.onopen = function(event){
+    BSwebsocket.addEventListener("open", function(event){
         BSstatus.text("Connected. Click to reset. Right click to disable. Middle click to sync page.");
         BSattach();
+        if (resuming){
+            BSonpage();
+            BSenabled = true;
+        }
         if (BSvideo.paused) {
             BSonPause(null);
         } else {
             BSonPlay(null);
         }
         BSonsync();
-    };
+    });;
     BSwebsocket.onerror = function(event){
         BSstatus.text("Connection error. Click to retry.");
         BSenabled = false;
     };
     BSwebsocket.onmessage = BSmsghandler;
     BSwebsocket.onclose = function(event){
-        BSdisable();
+        if (event.code != 1000) {
+            BSdisable();
+        }
     };
 }
 
@@ -206,13 +211,22 @@ function BSdisable() {
     }
     BSaddr = null;
     BSenabled = false;
-    BSwebsocket.close(1000);
+    if (BSwebsocket.readyState <= 1) {
+        BSwebsocket.close(1000);
+    }
     BSdetach();
     BSstatus.text("Connection closed. Click to reconnect.");
 }
 
 function BSmsghandler(event) {
-    var data = JSON.parse(event.data);
+    var dataL = event.data.split(/\r?\n/)
+    for (var i in dataL) {
+        $.when(dataL[i]).done(BSdatahandler);
+    }
+}
+
+function BSdatahandler(rdata) {
+    var data = JSON.parse(rdata);
     if ((data.type == "PLAY" ||
          data.type == "PAUSE"||
          data.type == "SEEK" ||
@@ -230,24 +244,24 @@ function BSmsghandler(event) {
             }
             break;
         case "PLAY":
-            blocked = true;
+            pending ++;
             BSplayV(data.delay);
             $(BSvideo).one("seeking", function(event){
-                blocked = false;
+                pending --;
             });
             break;
         case "PAUSE":
-            blocked = true;
+            pending ++;
             BSpauseV(data.delay);
             $(BSvideo).one("seeking", function(event){
-                blocked = false;
+                pending --;
             });
             break;
         case "SEEK":
-            blocked = true;
+            pending ++;
             BSseekV(data.target, data.delay);
             $(BSvideo).one("seeking", function(event){
-                blocked = false;
+                pending --;
             });
             break;
         case "SYNC":
@@ -255,7 +269,9 @@ function BSmsghandler(event) {
             break;
         case "PAGE":
             if (data.target != location.href) {
-                GM.setValue("lastAddr", BSaddr);
+                GM_setValue("lastAddr", BSaddr);
+                BSdisable();
+                BSstatus.remove();
                 location.href = data.target;
             }
             break;
