@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      1.0.1
+// @version      1.0.2
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -27,10 +27,10 @@ var BSstatus;
 var BSvideo;
 var BSenabled;
 var BSwebsocket;
-var pending = 0;
+var pending;
 var syncTask;
 var delayTask;
-var estDelay = 0;
+var estDelay;
 
 function BiliSync_Main() {
     BSstatus = $("<div/>").text("BiliSync Standby, click to enable.").css("text-align","center").css("font-size","15px").css("padding","2px");
@@ -178,6 +178,7 @@ function BSenable(resuming) {
         BSaddr = "wss://" + host + "/sync";
     }
     BSenabled = true;
+    pending = 0;
     BSwebsocket = new WebSocket(BSaddr);
     BSwebsocket.addEventListener("open", function(event){
         BSstatus.text("Connected. Click to reset. Right click to disable. Middle click to sync page.");
@@ -237,7 +238,7 @@ function BSdatahandler(rdata) {
     switch(data.type) {
         case "PING":
             var newDelay = ($.now() - data.timestamp) / 2
-            if (estDelay == 0) {
+            if (!estDelay) {
                 estDelay = newDelay
             } else {
                 estDelay = estDelay * 0.9 + newDelay * 0.1
