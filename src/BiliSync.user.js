@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      0.3
+// @version      0.3.1
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -176,6 +176,7 @@ function BSmsghandler(event) {
             } else {
                 estDelay = estDelay * 0.9 + newDelay * 0.1
             }
+            break;
         case "PLAY":
             blocked = true;
             BSplayV(data.delay);
