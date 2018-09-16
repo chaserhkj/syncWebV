@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      0.6.2
+// @version      1.0
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -17,7 +17,7 @@
 // Default host is set to my party VPN private address, which is easier for my
 // friends to setup. You may want to change this.
 var BSdefaultHost = "desktop.fastpub.zt.chaserhkj.me:4433"
-var BSaddr;
+var BSaddr = null;
 waitForKeyElements(".bilibili-player-video video", BiliSync_Main, true);
 var syncInterval = 5;
 var syncDiff = 1;
@@ -48,6 +48,9 @@ function BiliSync_Main() {
     var mo = new MutationObserver(function(mList){
         for(var mutation of mList) {
             if (mutation.type == 'childList' && mutation.removedNodes.length > 0) {
+                if (BSenabled) {
+                    GM.setValue("lastAddr", BSaddr);
+                }
                 BSdisable();
                 BSstatus.remove();
                 waitForKeyElements(".bilibili-player-video video", BiliSync_Main, true);
@@ -55,6 +58,12 @@ function BiliSync_Main() {
         }
     });
     mo.observe($("div.bilibili-player-video")[0], mo_config);
+    var storeAddr = GM.getValue("lastAddr", "");
+    if (storeAddr != ""){
+        BSaddr = storeAddr;
+        BSenable();
+        BSonpage();
+    }
 }
 
 function BSplayV(delay) {
@@ -117,6 +126,11 @@ function BSonsync() {
     BSwebsocket.send(JSON.stringify(data));
 }
 
+function BSonpage() {
+    var data = {type:"PAGE", target:location.href};
+    BSwebsocket.send(JSON.stringify(data));
+}
+
 function BSattach() {
     $(BSvideo).on("play", BSonPlay);
     $(BSvideo).on("pause", BSonPause);
@@ -127,6 +141,7 @@ function BSattach() {
         BSwebsocket.send(JSON.stringify(data));
     }, 1000 * delayInterval);
     BSstatus.on("contextmenu", BScontextMenu);
+    BSstatus.on("mousedown", BSmiddledown);
 }
 
 function BSdetach() {
@@ -136,6 +151,13 @@ function BSdetach() {
     clearInterval(syncTask);
     clearInterval(delayTask);
     BSstatus.off("contextmenu", BScontextMenu);
+    BSstatus.off("mousedown", BSmiddledown);
+}
+
+function BSmiddledown(event) {
+    if (event.which == 2) {
+        BSonpage();
+    }
 }
 
 function BScontextMenu(event) {
@@ -147,15 +169,19 @@ function BSenable() {
     if (BSenabled) {
         return;
     }
-    var host = prompt("Please enter Host:Port", BSdefaultHost);
-    if (host == null) {
-        return;
+    // Reset value on init
+    GM.setValue("lastAddr", "");
+    if (BSaddr == null)  {
+        var host = prompt("Please enter Host:Port", BSdefaultHost);
+        if (host == null) {
+            return;
+        }
+        BSaddr = "wss://" + host + "/sync";
     }
     BSenabled = true;
-    BSaddr = "wss://" + host + "/sync";
     BSwebsocket = new WebSocket(BSaddr);
     BSwebsocket.onopen = function(event){
-        BSstatus.text("Connection established. Click to reset playback. Right click to disable.");
+        BSstatus.text("Connected. Click to reset. Right click to disable. Middle click to sync page.");
         BSattach();
         if (BSvideo.paused) {
             BSonPause(null);
@@ -178,6 +204,7 @@ function BSdisable() {
     if (!BSenabled) {
         return;
     }
+    BSaddr = null;
     BSenabled = false;
     BSwebsocket.close(1000);
     BSdetach();
@@ -186,7 +213,11 @@ function BSdisable() {
 
 function BSmsghandler(event) {
     var data = JSON.parse(event.data);
-    if (data.type != "PING" && data.page != location.href) {
+    if ((data.type == "PLAY" ||
+         data.type == "PAUSE"||
+         data.type == "SEEK" ||
+         data.type == "SYNC")
+        && data.page != location.href) {
         return;
     }
     switch(data.type) {
@@ -221,6 +252,12 @@ function BSmsghandler(event) {
             break;
         case "SYNC":
             BSsyncV(data.target, data.delay);
+            break;
+        case "PAGE":
+            if (data.target != location.href) {
+                GM.setValue("lastAddr", BSaddr);
+                location.href = data.target;
+            }
             break;
     }
 }
