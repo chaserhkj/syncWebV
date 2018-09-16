@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      0.5.2
+// @version      0.5.3
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -153,6 +153,11 @@ function BSenable() {
     BSwebsocket.onopen = function(event){
         BSstatus.text("Connection established. Click to reset playback. Right click to disable.");
         BSattach();
+        if (BSvideo.paused) {
+            BSonPaused(null);
+        } else {
+            BSonPlay(null);
+        }
     };
     BSwebsocket.onerror = function(event){
         BSstatus.text("Connection error. Click to retry.");
