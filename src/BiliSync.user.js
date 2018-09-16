@@ -9,8 +9,13 @@
 // @grant        none
 // @require      https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js
 // @require      https://gist.github.com/raw/2625891/waitForKeyElements.js
+// @updateURL    https://github.com/chaserhkj/syncWebV/raw/master/src/BiliSync.user.js
+// @downloadURL  https://github.com/chaserhkj/syncWebV/raw/master/src/BiliSync.user.js
+// @supportURL   https://github.com/chaserhkj/syncWebV/
 // ==/UserScript==
-var BSdefaultHost = "127.0.0.1:8080"
+// Default host is set to my party VPN private address, which is easier for my
+// friends to setup. You may want to change this.
+var BSdefaultHost = "10.117.127.251:8080"
 waitForKeyElements(".bilibili-player-video video", BiliSync_Main, true);
 var syncInterval = 5;
 var syncDiff = 1;
