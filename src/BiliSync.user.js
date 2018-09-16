@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      0.4
+// @version      0.5
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -121,6 +121,7 @@ function BSattach() {
         var data = {type:"PING", timestamp:$.now()}
         BSwebsocket.send(JSON.stringify(data));
     }, 1000 * delayInterval);
+    BSstatus.on("contextmenu", BScontextMenu);
 }
 
 function BSdetach() {
@@ -129,6 +130,12 @@ function BSdetach() {
     $(BSvideo).off("seeking", BSonSeek);
     clearInterval(syncTask);
     clearInterval(delayTask);
+    BSstatus.off("contextmenu", BScontextMenu);
+}
+
+function BScontextMenu(event) {
+    BSdisable();
+    event.preventDefault();
 }
 
 function BSenable() {
@@ -143,7 +150,7 @@ function BSenable() {
     host = "wss://" + host + "/sync";
     BSwebsocket = new WebSocket(host);
     BSwebsocket.onopen = function(event){
-        BSstatus.text("Connection established. Click to reset playback.");
+        BSstatus.text("Connection established. Click to reset playback. Right click to disable.");
         BSattach();
     };
     BSwebsocket.onerror = function(event){
