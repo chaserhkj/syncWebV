@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BiliSync
 // @namespace    https://github.com/chaserhkj/
-// @version      1.0.2
+// @version      1.1
 // @description  Bilibili syncplay script
 // @author       Chaserhkj
 // @match        https://www.bilibili.com/video/*
@@ -65,37 +65,54 @@ function BiliSync_Main() {
     }
 }
 
+// Play without signaling
 function BSplayV(delay) {
     if (BSvideo.paused) {
+        pending ++;
         BSvideo.click();
+        $(BSvideo).one("play", function(event){
+            pending --;
+        });
     }
+    //
     BSseekV(BSvideo.currentTime, delay);
 }
 
+// Pause without signaling
 function BSpauseV(delay) {
     if (!BSvideo.paused) {
+        pending ++;
         BSvideo.click();
+        $(BSvideo).one("pause", function(event){
+            pending --;
+        });
     }
     BSseekV(BSvideo.currentTime, delay);
 }
 
+// Seek without signaling
 function BSseekV(target, delay) {
+    pending ++;
     BSvideo.currentTime = target + (delay + estDelay) / 1000;
+    $(BSvideo).one("seeking", function(event){
+        pending --;
+    });
 }
 
 function BSsyncV(target, delay) {
     if ((BSvideo.currentTime - target - (delay + estDelay) / 1000) >= syncDiff) {
-        pending ++;
         BSseekV(target, delay);
-        $(BSvideo).one("seeking", function(event){
-                pending --;
-        });
     }
 }
 
-function BSresetV(target) {
+// Reset with explicit signal
+function BSresetV(target, noSignal) {
     BSvideo.currentTime = 0;
     BSpauseV();
+    if (!noSignal){
+        BSonSeek(null);
+        BSonPause(null);
+    }
 }
 
 function BSonPlay(event){
@@ -121,7 +138,7 @@ function BSonSeek(event) {
 }
 
 function BSonsync() {
-    var data = {type:"SYNC", target:BSvideo.currentTime, delay:estDelay, page:location.href};
+    var data = {type:"SYNC", target:BSvideo.currentTime, paused:BSvideo.paused, delay:estDelay, page:location.href};
     BSwebsocket.send(JSON.stringify(data));
 }
 
@@ -187,11 +204,6 @@ function BSenable(resuming) {
             BSonpage();
             BSenabled = true;
         }
-        if (BSvideo.paused) {
-            BSonPause(null);
-        } else {
-            BSonPlay(null);
-        }
         BSonsync();
     });;
     BSwebsocket.onerror = function(event){
@@ -245,28 +257,23 @@ function BSdatahandler(rdata) {
             }
             break;
         case "PLAY":
-            pending ++;
             BSplayV(data.delay);
-            $(BSvideo).one("seeking", function(event){
-                pending --;
-            });
             break;
         case "PAUSE":
-            pending ++;
             BSpauseV(data.delay);
-            $(BSvideo).one("seeking", function(event){
-                pending --;
-            });
             break;
         case "SEEK":
-            pending ++;
             BSseekV(data.target, data.delay);
-            $(BSvideo).one("seeking", function(event){
-                pending --;
-            });
             break;
         case "SYNC":
             BSsyncV(data.target, data.delay);
+            if (data.paused != undefined) {
+                if (data.paused) {
+                    BSpauseV(data.delay);
+                } else {
+                    BSplayV(data.delay);
+                }
+            }
             break;
         case "PAGE":
             if (data.target != location.href) {
