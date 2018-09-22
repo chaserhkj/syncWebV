@@ -27,7 +27,9 @@ var BSstatus;
 var BSvideo;
 var BSenabled;
 var BSwebsocket;
-var pending;
+var pendingPlay;
+var pendingPause;
+var pendingSeek;
 var syncTask;
 var delayTask;
 var estDelay;
@@ -68,34 +70,33 @@ function BiliSync_Main() {
 // Play without signaling
 function BSplayV(delay) {
     if (BSvideo.paused) {
-        pending ++;
+        pendingPlay ++;
         BSvideo.click();
         $(BSvideo).one("play", function(event){
-            pending --;
+            pendingPlay --;
         });
+        BSseekV(BSvideo.currentTime, delay);
     }
-    //
-    BSseekV(BSvideo.currentTime, delay);
 }
 
 // Pause without signaling
 function BSpauseV(delay) {
     if (!BSvideo.paused) {
-        pending ++;
+        pendingPause ++;
         BSvideo.click();
         $(BSvideo).one("pause", function(event){
-            pending --;
+            pendingPause --;
         });
+        BSseekV(BSvideo.currentTime, delay);
     }
-    BSseekV(BSvideo.currentTime, delay);
 }
 
 // Seek without signaling
 function BSseekV(target, delay) {
-    pending ++;
+    pendingSeek ++;
     BSvideo.currentTime = target + (delay + estDelay) / 1000;
     $(BSvideo).one("seeking", function(event){
-        pending --;
+        pendingSeek --;
     });
 }
 
@@ -116,21 +117,21 @@ function BSresetV(target, noSignal) {
 }
 
 function BSonPlay(event){
-    if (!BSenabled || pending > 0) {
+    if (!BSenabled || pendingPlay > 0) {
         return;
     }
     var data = {type:"PLAY", delay:estDelay, page:location.href};
     BSwebsocket.send(JSON.stringify(data));
 }
 function BSonPause(event) {
-    if (!BSenabled || pending > 0) {
+    if (!BSenabled || pendingPause > 0) {
         return;
     }
     var data = {type:"PAUSE", delay:estDelay, page:location.href};
     BSwebsocket.send(JSON.stringify(data));
 }
 function BSonSeek(event) {
-    if (!BSenabled || pending > 0) {
+    if (!BSenabled || pendingSeek > 0) {
         return;
     }
     var data = {type:"SEEK", target:BSvideo.currentTime, delay:estDelay, page:location.href};
@@ -195,7 +196,9 @@ function BSenable(resuming) {
         BSaddr = "wss://" + host + "/sync";
     }
     BSenabled = true;
-    pending = 0;
+    pendingPlay = 0;
+    pendingPause = 0;
+    pendingSeek = 0;
     BSwebsocket = new WebSocket(BSaddr);
     BSwebsocket.addEventListener("open", function(event){
         BSstatus.text("Connected. Click to reset. Right click to disable. Middle click to sync page.");
